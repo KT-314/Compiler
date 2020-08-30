@@ -2,31 +2,33 @@
 
 assert() {
 
-	expected="$1"
-	input="$2"
+   expected="$1"
+   input="$2"
 
-	./1cc "$input" > tmp.s || exit
-	gcc -static -o tmp tmp.s
-	./tmp
+   ./1cc "$input" > tmp.s || exit
+   gcc -static -o tmp tmp.s
+   ./tmp
 
-	actual="$?"
+   actual="$?"
 
-	if [ "$actual" = "$expected" ]; then
+   if [ "$actual" = "$expected" ]; then
 
-		echo "$input => $actual"
+      echo "$input => $actual"
 
-	else
+   else
 
-		echo "$input => $expected expected, but got $actual"
+      echo "$input => $expected expected, but got $actual"
 
-		exit 1
+      exit 1
 
-	fi
+   fi
 
 }
 
 assert 0   0
 assert 255 255
+assert 21  '5+20-4'
+
 
 echo OK
 
