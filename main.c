@@ -26,6 +26,9 @@ struct Token {
    int     length; // トークンの長さ
 };
 
+// 入力文字列
+static char *current_input;
+
 // エラーを報告して終了します
 static void error(char *fmt, ...) {
 
@@ -34,6 +37,31 @@ static void error(char *fmt, ...) {
    vfprintf(stderr, fmt, ap);
    fprintf(stderr, "\n");
    exit(1);
+}
+
+// エラーの場所を報告して終了します
+static void verror_at(char *loc, char *fmt, va_list ap) {
+
+   int pos = loc - current_input;
+   fprintf(stderr, "%s\n", current_input);
+   fprintf(stderr, "%*s", pos, ""); // pos スペースを出力します
+   fprintf(stderr, "^___ ");
+   vfprintf(stderr, fmt, ap);
+   fprintf(stderr, "\n");
+   exit(1);
+}
+
+static void error_at(char *loc, char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  verror_at(loc, fmt, ap);
+}
+
+static void error_tok(Token *tok, char *fmt, ...) {
+
+   va_list ap;
+   va_start(ap, fmt);
+   verror_at(tok->location, fmt, ap);
 }
 
 // `s` に一致する場合、現在のトークンを消費します
@@ -47,7 +75,7 @@ static bool equal(Token *tok, char *s) {
 static Token *skip(Token *tok, char *s) {
 
    if (!equal(tok, s))
-      error("予期されるトークン '%s'", s);
+      error_tok(tok, "予期されるトークン '%s'", s);
    return tok->next;
 }
 
@@ -55,7 +83,7 @@ static Token *skip(Token *tok, char *s) {
 static long get_number(Token *tok) {
 
    if (tok->kind != TK_NUMERIC)
-      error("数値が必要です");
+      error_tok(tok, "数値が必要です");
    return tok->value;
 }
 
@@ -70,9 +98,10 @@ static Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
    return tok;
 }
 
-// `p` をトークン化し新しいトークンを返します
-static Token *tokenize(char *p) {
+// `current_input` をトークン化し、新しいトークンを返します
+static Token *tokenize(void) {
 
+   char *p = current_input;
    Token head = {};
    Token *cur = &head;
 
@@ -99,7 +128,7 @@ static Token *tokenize(char *p) {
          continue;
       }
 
-      error("無効なトークンです");
+      error_at(p, "無効なトークンです");
    }
 
    new_token(TK_EOF, cur, p, 0);
@@ -108,12 +137,11 @@ static Token *tokenize(char *p) {
 
 int main(int argc, char **argv) {
 
-   if (argc != 2) {
-      fprintf(stderr, "%s: 引数の数が無効です\n", argv[0]);
-      return 1;
-   }
+   if (argc != 2) 
+      error("%s: 引数の数が無効です\n", argv[0]);
 
-   Token *tok = tokenize(argv[1]);
+   current_input = argv[1];
+   Token *tok = tokenize();
 
    printf(".globl main\n");
    printf("main:\n");
