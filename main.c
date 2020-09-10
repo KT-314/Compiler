@@ -62,45 +62,57 @@ static void error_at(char *loc, char *fmt, ...) {
    verror_at(loc, fmt, ap);
 }
 
-static void error_tok(Token *tok, char *fmt, ...) {
+static void error_token(Token *token, char *fmt, ...) {
 
    va_list ap;
    va_start(ap, fmt);
-   verror_at(tok->location, fmt, ap);
+   verror_at(token->location, fmt, ap);
 }
 
 // `sign` ( 記号) に一致する場合、現在のトークンを消費します
-static bool equal(Token *tok, char *sign) {
+static bool equal(Token *token, char *sign) {
 
-   return strlen(sign) == tok->length &&
-         !strncmp(tok->location, sign, tok->length);
+   return strlen(sign) == token->length &&
+         !strncmp(token->location, sign, token->length);
 }
 
 // 現在のトークンが `sign` ( 記号) であることを確認します
-static Token *skip(Token *tok, char *sign) {
+static Token *skip(Token *token, char *sign) {
 
-   if (!equal(tok, sign))
-      error_tok(tok, "予期されるトークン '%s'", sign);
-   return tok->next;
+   if (!equal(token, sign)) {
+
+      error_token(token, "予期されるトークン '%s'", sign);
+   }
+
+   return token->next;
 }
 
 // 現在のトークンがTK_NUMERIC(数値リテラル) であることを確認します
-static long get_number(Token *tok) {
+static long get_number(Token *token) {
 
-   if (tok->kind != TK_NUMERIC)
-      error_tok(tok, "数値が必要です");
-   return tok->value;
+   if (token->kind != TK_NUMERIC) {
+
+      error_token(token, "数値が必要です");
+   }
+
+   return token->value;
 }
 
 // 新しいトークンを作成し`cur` の次のトークンとして追加します
 static Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
 
-   Token *tok    = calloc(1, sizeof(Token));
-   tok->kind     = kind;
-   tok->location = str;
-   tok->length   = len;
-   cur->next     = tok;
-   return tok;
+   Token *token    = calloc(1, sizeof(Token));
+   token->kind     = kind;
+   token->location = str;
+   token->length   = len;
+   cur->next       = token;
+
+   return token;
+}
+
+static bool startswith(char *p, char *q) {
+
+   return strncmp(p, q, strlen(q)) == 0;
 }
 
 // `current_input` をトークン化し、新しいトークンを返します
@@ -129,7 +141,17 @@ static Token *tokenize(void) {
          continue;
       }
 
-      // 句読点
+      // 複数文字の句読点
+      if (startswith(argument, "==") || startswith(argument, "!=") ||
+          startswith(argument, "<=") || startswith(argument, ">=")) {
+
+         current = new_token(TK_RESERVED, current, argument, 2);
+
+         argument += 2;
+         continue;
+      }
+
+      // 1文字の句読点
       if (ispunct(*argument)) {
 
          current = new_token(TK_RESERVED, current, argument++, 1);
@@ -140,6 +162,7 @@ static Token *tokenize(void) {
    }
 
    new_token(TK_EOF, current, argument, 0);
+
    return head.next;
 }
 
@@ -153,6 +176,10 @@ typedef enum {
    ND_SUB,         // -
    ND_MUL,         // *
    ND_DIV,         // /
+   ND_EQ,          // ==
+   ND_NE,          // !=
+   ND_LT,          // <
+   ND_LE,          // <=
    ND_NUM,         // 整数
 
 } NodeKind;
@@ -162,8 +189,8 @@ typedef struct Node Node;
 struct Node {
 
    NodeKind kind;  // ノードの種類
-   Node     *lhs;  // 左側
-   Node     *rhs;  // 右側
+   Node     *lhs;  // 左側(Left-hand side)
+   Node     *rhs;  // 右側(Right-hand side)
    long      val;  // 種類== ND_NUM の場合に使用
 };
 
@@ -171,6 +198,7 @@ static Node *new_node(NodeKind kind) {
 
    Node *node = calloc(1, sizeof(Node));
    node->kind = kind;
+
    return node;
 }
 
@@ -179,6 +207,7 @@ static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs) {
    Node *node = new_node(kind);
    node->lhs  = lhs;
    node->rhs  = rhs;
+
    return node;
 }
 
@@ -186,92 +215,176 @@ static Node *new_num(long val) {
 
    Node *node = new_node(ND_NUM);
    node->val  = val;
+
    return node;
 }
 
-static Node *expr(Token **rest, Token *tok);
-static Node *mul(Token **rest, Token *tok);
-static Node *unary(Token **rest, Token *tok);
-static Node *primary(Token **rest, Token *tok);
+static Node *expr(Token **rest, Token *token);
+static Node *equality(Token **rest, Token *token);
+static Node *relational(Token **rest, Token *token);
+static Node *add(Token **rest, Token *token);
+static Node *mul(Token **rest, Token *token);
+static Node *unary(Token **rest, Token *token);
+static Node *primary(Token **rest, Token *token);
 
-//           expr = mul ("+" mul | "-" mul)*
-static Node *expr(Token **rest, Token *tok) {
+//           expr = equality
+static Node *expr(Token **rest, Token *token) {
 
-   Node *node = mul(&tok, tok);
+   return equality(rest, token);
+}
+
+//           equality = relational ("==" relational | "!=" relational)*
+static Node *equality(Token **rest, Token *token) {
+
+   Node *node = relational(&token, token);
 
    for (;;) {
 
-      if (equal(tok, "+")) {
+      if (equal(token, "==")) {
 
-         Node *rhs = mul(&tok, tok->next);
+         Node *rhs = relational(&token, token->next);
+         node = new_binary(ND_EQ, node, rhs);
+         continue;
+      }
+
+      if (equal(token, "!=")) {
+
+         Node *rhs = relational(&token, token->next);
+         node = new_binary(ND_NE, node, rhs);
+         continue;
+      }
+
+      *rest = token;
+
+      return node;
+   }
+}
+
+//           relational = add ("<" add | "<=" add | ">" add | ">=" add)*
+static Node *relational(Token **rest, Token *token) {
+
+   Node *node = add(&token, token);
+
+   for (;;) {
+
+      if (equal(token, "<")) {
+
+         Node *rhs = add(&token, token->next);
+         node = new_binary(ND_LT, node, rhs);
+         continue;
+      }
+
+      if (equal(token, "<=")) {
+
+         Node *rhs = add(&token, token->next);
+         node = new_binary(ND_LE, node, rhs);
+         continue;
+      }
+
+      if (equal(token, ">")) {
+
+         Node *rhs = add(&token, token->next);
+         node = new_binary(ND_LT, rhs, node);
+         continue;
+      }
+
+      if (equal(token, ">=")) {
+
+         Node *rhs = add(&token, token->next);
+         node = new_binary(ND_LE, rhs, node);
+         continue;
+      }
+
+      *rest = token;
+
+      return node;
+   }
+}
+
+//           add = mul ("+" mul | "-" mul)*
+static Node *add(Token **rest, Token *token) {
+
+   Node *node = mul(&token, token);
+
+   for (;;) {
+
+      if (equal(token, "+")) {
+
+         Node *rhs = mul(&token, token->next);
          node = new_binary(ND_ADD, node, rhs);
          continue;
       }
 
-      if (equal(tok, "-")) {
+      if (equal(token, "-")) {
 
-         Node *rhs = mul(&tok, tok->next);
+         Node *rhs = mul(&token, token->next);
          node = new_binary(ND_SUB, node, rhs);
          continue;
       }
 
-     *rest = tok;
+     *rest = token;
+
      return node;
    }
 }
 
 //           mul = unary ("*" unary | "/" unary)*
-static Node *mul(Token **rest, Token *tok) {
+static Node *mul(Token **rest, Token *token) {
 
-   Node *node = unary(&tok, tok);
+   Node *node = unary(&token, token);
 
    for (;;) {
 
-      if (equal(tok, "*")) {
+      if (equal(token, "*")) {
 
-         Node *rhs = unary(&tok, tok->next);
+         Node *rhs = unary(&token, token->next);
          node = new_binary(ND_MUL, node, rhs);
          continue;
       }
 
-      if (equal(tok, "/")) {
+      if (equal(token, "/")) {
 
-         Node *rhs = unary(&tok, tok->next);
+         Node *rhs = unary(&token, token->next);
          node = new_binary(ND_DIV, node, rhs);
          continue;
       }
 
-      *rest = tok;
+      *rest = token;
+
       return node;
    }
 }
 
 //           unary = ("+" | "-") unary | primary
-static Node *unary(Token **rest, Token *tok) {
+static Node *unary(Token **rest, Token *token) {
 
-   if (equal(tok, "+"))
+   if (equal(token, "+")) {
 
-      return unary(rest, tok->next);
+      return unary(rest, token->next);
+   }
 
-   if (equal(tok, "-"))
+   if (equal(token, "-")) {
 
-      return new_binary(ND_SUB, new_num(0), unary(rest, tok->next));
+      return new_binary(ND_SUB, new_num(0), unary(rest, token->next));
+   }
 
-   return primary(rest, tok);
+   return primary(rest, token);
 }
 
 //           primary = "(" expr ")" | num
-static Node *primary(Token **rest, Token *tok) {
+static Node *primary(Token **rest, Token *token) {
 
-   if (equal(tok, "(")) {
+   if (equal(token, "(")) {
 
-      Node *node = expr(&tok, tok->next);
-      *rest = skip(tok, ")");
+      Node *node = expr(&token, token->next);
+      *rest = skip(token, ")");
+
       return node;
    }
 
-  Node *node = new_num(get_number(tok));
-  *rest = tok->next;
+  Node *node = new_num(get_number(token));
+  *rest = token->next;
+
   return node;
 }
 
@@ -279,13 +392,16 @@ static Node *primary(Token **rest, Token *tok) {
 // Code generator
 //
 
-static char *reg(int idx) {
+static char *re_gister(int index) {
 
    static char *r[] = {"%r10", "%r11", "%r12", "%r13", "%r14", "%r15"};
 
-   if (idx < 0 || sizeof(r) / sizeof(*r) <= idx)
-      error("register out of range: %d", idx);
-      return r[idx];
+   if (index < 0 || sizeof(r) / sizeof(*r) <= index) {
+
+      error("レジスタが範囲外です: %d", index);
+   }
+
+   return r[index];
 }
 
 static int top;
@@ -294,75 +410,115 @@ static void gen_expr(Node *node) {
 
    if (node->kind == ND_NUM) {
 
-      printf("  mov $%lu, %s\n", node->val, reg(top++));
+      printf("   mov $%lu, %s\n", node->val, re_gister(top++));
+
       return;
    }
 
    gen_expr(node->lhs);
    gen_expr(node->rhs);
 
-   char *rd = reg(top - 2);
-   char *rs = reg(top - 1);
+   char *rd = re_gister(top - 2);
+   char *rs = re_gister(top - 1);
    top--;
 
    switch (node->kind) {
 
       case ND_ADD:
-         printf("  add %s, %s\n", rs, rd);
+
+         printf("   add %s, %s\n", rs, rd);
          return;
+
       case ND_SUB:
-         printf("  sub %s, %s\n", rs, rd);
+
+         printf("   sub %s, %s\n", rs, rd);
          return;
+
       case ND_MUL:
-         printf("  imul %s, %s\n", rs, rd);
+
+         printf("   imul %s, %s\n", rs, rd);
          return;
+
       case ND_DIV:
-         printf("  mov %s, %%rax\n", rd);
-         printf("  cqo\n");
-         printf("  idiv %s\n", rs);
-         printf("  mov %%rax, %s\n", rd);
+
+         printf("   mov %s, %%rax\n",   rd);
+         printf("   cqo\n"                );
+         printf("   idiv %s\n",         rs);
+         printf("   mov %%rax, %s\n",   rd);
          return;
+
+      case ND_EQ:
+
+         printf("   cmp %s, %s\n", rs,  rd);
+         printf("   sete %%al\n");
+         printf("   movzb %%al, %s\n",  rd);
+         return;
+
+      case ND_NE:
+
+         printf("   cmp %s, %s\n", rs,  rd);
+         printf("   setne %%al\n");
+         printf("   movzb %%al, %s\n",  rd);
+         return;
+
+      case ND_LT:
+
+         printf("   cmp %s, %s\n", rs,  rd);
+         printf("   setl %%al\n");
+         printf("   movzb %%al, %s\n",  rd);
+         return;
+
+      case ND_LE:
+
+         printf("   cmp %s, %s\n", rs,  rd);
+         printf("   setle %%al\n");
+         printf("   movzb %%al, %s\n",  rd);
+         return;
+
       default:
-         error("invalid expression");
+         error("無効な式です");
    }
 }
 
 int main(int argc, char **argv) {
 
-   if (argc != 2)
+   if (argc != 2) {
 
       error("%s: 引数の数が無効です", argv[0]);
+   }
 
    // トークン化して解析します
    current_input = argv[1];
-   Token *tok = tokenize();
-   Node *node = expr(&tok, tok);
+   Token *token  = tokenize();
+   Node *node    = expr(&token, token);
 
-   if (tok->kind != TK_EOF)
+   if (token->kind != TK_EOF) {
 
-      error_tok(tok, "extra token");
+      error_token(token, "追加のトークン");
+   }
 
    printf(".globl main\n");
    printf("main:\n");
 
    // 呼び出し先が保存したレジスタを保存します
-   printf("  push %%r12\n");
-   printf("  push %%r13\n");
-   printf("  push %%r14\n");
-   printf("  push %%r15\n");
+   printf("   push %%r12\n");
+   printf("   push %%r13\n");
+   printf("   push %%r14\n");
+   printf("   push %%r15\n");
 
    // AST をトラバースしてアセンブリを出力します
    gen_expr(node);
 
-   // 式の結果をRAXに設定して、
+   // 式の結果をRAX に設定して、
    // 結果はこの関数の戻り値になります
-   printf("  mov %s, %%rax\n", reg(top - 1));
+   printf("   mov %s, %%rax\n", re_gister(top - 1));
 
-   printf("  pop %%r15\n");
-   printf("  pop %%r14\n");
-   printf("  pop %%r13\n");
-   printf("  pop %%r12\n");
-   printf("  ret\n");
+   printf("   pop %%r15\n");
+   printf("   pop %%r14\n");
+   printf("   pop %%r13\n");
+   printf("   pop %%r12\n");
+   printf("   ret\n");
+
    return 0;
 }
 
