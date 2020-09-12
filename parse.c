@@ -3,6 +3,7 @@
 #include "1cc.h"
 
 static Node *expr(Token **rest, Token *token);
+static Node *expr_stmt(Token **rest, Token *token);
 static Node *equality(Token **rest, Token *token);
 static Node *relational(Token **rest, Token *token);
 static Node *add(Token **rest, Token *token);
@@ -27,6 +28,14 @@ static Node *new_binary(NodeKind kind, Node *lhs, Node *rhs) {
    return node;
 }
 
+static Node *new_unary(NodeKind kind, Node *expr) {
+
+   Node *node = new_node(kind);
+   node->lhs  = expr;
+
+   return node;
+}
+
 static Node *new_num(long val) {
 
    Node *node = new_node(ND_NUM);
@@ -44,6 +53,21 @@ static long get_number(Token *token) {
    }
 
    return token->value;
+}
+
+//           stmt = expr-stmt
+static Node *stmt(Token **rest, Token *token) {
+
+   return expr_stmt(rest, token);
+}
+
+//           expr-stmt = expr ";"
+static Node *expr_stmt(Token **rest, Token *token) {
+
+   Node *node = new_unary(ND_EXPR_STMT, expr(&token, token));
+   *rest = skip(token, ";");
+
+   return node;
 }
 
 //           expr = equality
@@ -207,15 +231,17 @@ static Node *primary(Token **rest, Token *token) {
   return node;
 }
 
+//    program = stmt*
 Node *parse(Token *token) {
 
-   Node *node = expr(&token, token);
+   Node head = {};
+   Node *cur = &head;
 
-   if (token->kind != TK_EOF) {
+   while (token->kind != TK_EOF) {
 
-      error_token(token, "追加のトークン");
+   cur = cur->next = stmt(&token, token);
    }
 
-   return node;
+   return head.next;
 }
 

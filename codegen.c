@@ -86,7 +86,24 @@ static void gen_expr(Node *node) {
          return;
 
       default:
+
          error("無効な式です");
+   }
+}
+
+static void gen_stmt(Node *node) {
+
+   switch (node->kind) {
+
+      case ND_EXPR_STMT:
+
+         gen_expr(node->lhs);
+         printf("  mov %s, %%rax\n", re_gister(--top));
+         return;
+
+   default:
+
+      error("invalid statement");
    }
 }
 
@@ -101,12 +118,11 @@ void codegen(Node *node) {
    printf("   push %%r14\n");
    printf("   push %%r15\n");
 
-   // AST をトラバースしてアセンブリを出力します
-   gen_expr(node);
+   for (Node *n = node; n; n = n->next) {
 
-   // 式の結果をRAX に設定して、
-   // 結果はこの関数の戻り値になります
-   printf("   mov %s, %%rax\n", re_gister(top - 1));
+      gen_stmt(n);
+      assert(top == 0);
+   }
 
    printf("   pop %%r15\n");
    printf("   pop %%r14\n");

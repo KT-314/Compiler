@@ -1,5 +1,6 @@
 // 1cc.h
 
+#include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -50,6 +51,7 @@ typedef enum {
    ND_NE,          // !=
    ND_LT,          // <
    ND_LE,          // <=
+   ND_EXPR_STMT,   // 式ステートメント
    ND_NUM,         // 整数
 
 } NodeKind;
@@ -59,6 +61,7 @@ typedef struct Node Node;
 struct Node {
 
    NodeKind kind;  // ノードの種類
+   Node    *next;  // 次のノード
    Node     *lhs;  // 左側(Left-hand side)
    Node     *rhs;  // 右側(Right-hand side)
    long      val;  // 種類== ND_NUM の場合に使用
