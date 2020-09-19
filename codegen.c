@@ -95,10 +95,17 @@ static void gen_stmt(Node *node) {
 
    switch (node->kind) {
 
-      case ND_EXPR_STMT:
+      case ND_RETURN:
 
          gen_expr(node->lhs);
          printf("  mov %s, %%rax\n", re_gister(--top));
+         printf("  jmp .L.return\n");
+         return;
+
+      case ND_EXPR_STMT:
+
+         gen_expr(node->lhs);
+         top--;
          return;
 
    default:
@@ -124,6 +131,7 @@ void codegen(Node *node) {
       assert(top == 0);
    }
 
+   printf(".L.return:\n");
    printf("   pop %%r15\n");
    printf("   pop %%r14\n");
    printf("   pop %%r13\n");

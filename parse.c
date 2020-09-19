@@ -55,8 +55,16 @@ static long get_number(Token *token) {
    return token->value;
 }
 
-//           stmt = expr-stmt
+//           stmt = "return" expr ";"
+//                |  expr-stmt
 static Node *stmt(Token **rest, Token *token) {
+
+   if (equal(token, "return")) {
+
+      Node *node = new_unary(ND_RETURN, expr(&token, token->next));
+      *rest = skip(token, ";");
+      return node;
+   }
 
    return expr_stmt(rest, token);
 }
