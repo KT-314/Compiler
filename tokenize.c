@@ -122,9 +122,13 @@ Token *tokenize(char *argument) {
       }
 
       // 識別子
-      if ('a' <= *argument && *argument <= 'z') {
+      if (is_alpha(*argument)) {
 
-         current = new_token(TK_IDENT, current, argument++, 1);
+         char *q = argument++;
+
+         while (is_alnum(*argument))
+         argument++;
+         current = new_token(TK_IDENT, current, q, argument - q);
          continue;
       }
 

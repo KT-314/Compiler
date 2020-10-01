@@ -1,5 +1,6 @@
 // 1cc.h
 
+#define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
@@ -9,9 +10,10 @@
 #include <string.h>
 
 //
-// Tokenizer
+// tokenizer.c
 //
 
+// トークン
 typedef enum {
 
    TK_RESERVED,    // キーワードまたは句読点
@@ -39,9 +41,19 @@ Token *skip(Token *token, char *sign);
 Token *tokenize(char *argument);
 
 //
-// Parser
+// parser.c
 //
 
+// ローカル変数
+typedef struct Var Var;
+struct Var {
+
+   Var  *next;
+   char *name;     // 変数名
+   int offset;     // RBP からのオフセット
+};
+
+// AST ノード
 typedef enum {
 
    ND_ADD,         // +
@@ -68,15 +80,23 @@ struct Node {
    Node    *next;  // 次のノード
    Node     *lhs;  // 左側(Left-hand side)
    Node     *rhs;  // 右側(Right-hand side)
-   char     name;  // 種類== ND_VAR の場合に使用
+   Var      *var;  // 種類== ND_VAR の場合に使用
    long      val;  // 種類== ND_NUM の場合に使用
 };
 
-Node *parse(Token *token);
+typedef struct Function Function;
+struct Function {
+
+   Node     *node;
+   Var    *locals;
+   int stack_size;
+};
+
+Function *parse(Token *tok);
 
 //
 // codegen.c
 //
 
-void codegen(Node *node);
+void codegen(Function *prog);
 

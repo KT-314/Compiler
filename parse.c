@@ -2,6 +2,10 @@
 
 #include "1cc.h"
 
+// 解析中に作成されるすべてのローカル変数インスタンスは
+// このリストに蓄積されます
+Var *locals;
+
 static Node *expr(Token **rest, Token *token);
 static Node *expr_stmt(Token **rest, Token *token);
 static Node *assign(Token **rest, Token *tok);
@@ -11,6 +15,18 @@ static Node *add(Token **rest, Token *token);
 static Node *mul(Token **rest, Token *token);
 static Node *unary(Token **rest, Token *token);
 static Node *primary(Token **rest, Token *token);
+
+// 名前でローカル変数を検索します
+static Var *find_var(Token *token) {
+
+   for (Var *var = locals; var; var = var->next)
+
+      if (strlen(var->name) == token->length &&
+         !strncmp(token->location, var->name, token->length))
+      return var;
+
+   return NULL;
+}
 
 static Node *new_node(NodeKind kind) {
 
@@ -45,12 +61,22 @@ static Node *new_num(long val) {
    return node;
 }
 
-static Node *new_var_node(char name) {
+static Node *new_var_node(Var *var) {
 
    Node *node = new_node(ND_VAR);
-   node->name = name;
+   node->var  = var;
 
    return node;
+}
+
+static Var *new_lvar(char *name) {
+
+   Var *var  = calloc(1, sizeof(Var));
+   var->name = name;
+   var->next = locals;
+   locals    = var;
+
+   return var;
 }
 
 // 現在のトークンがTK_NUMERIC(数値リテラル) であることを確認します
@@ -254,22 +280,27 @@ static Node *primary(Token **rest, Token *token) {
       return node;
    }
 
-   Node *node;
+   if (token->kind == TK_IDENT) {
 
-   if (token->kind == TK_IDENT)
+      Var *var = find_var(token);
 
-      node = new_var_node(*token->location);
+   if (!var)
 
-   else
-      node = new_num(get_number(token));
+      var = new_lvar(strndup(token->location, token->length));
 
+      *rest = token->next;
+
+      return new_var_node(var);
+   }
+
+   Node *node = new_num(get_number(token));
    *rest = token->next;
 
    return node;
 }
 
 //    program = stmt*
-Node *parse(Token *token) {
+Function *parse(Token *token) {
 
    Node head = {};
    Node *cur = &head;
@@ -279,6 +310,10 @@ Node *parse(Token *token) {
    cur = cur->next = stmt(&token, token);
    }
 
-   return head.next;
+   Function *prog = calloc(1, sizeof(Function));
+   prog->node     = head.next;
+   prog->locals   = locals;
+
+   return prog;
 }
 
