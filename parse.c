@@ -4,6 +4,7 @@
 
 static Node *expr(Token **rest, Token *token);
 static Node *expr_stmt(Token **rest, Token *token);
+static Node *assign(Token **rest, Token *tok);
 static Node *equality(Token **rest, Token *token);
 static Node *relational(Token **rest, Token *token);
 static Node *add(Token **rest, Token *token);
@@ -44,6 +45,14 @@ static Node *new_num(long val) {
    return node;
 }
 
+static Node *new_var_node(char name) {
+
+   Node *node = new_node(ND_VAR);
+   node->name = name;
+
+   return node;
+}
+
 // 現在のトークンがTK_NUMERIC(数値リテラル) であることを確認します
 static long get_number(Token *token) {
 
@@ -78,11 +87,23 @@ static Node *expr_stmt(Token **rest, Token *token) {
    return node;
 }
 
-//           expr = equality
+//           expr = assign
 static Node *expr(Token **rest, Token *token) {
 
-   return equality(rest, token);
+   return assign(rest, token);
 }
+
+//           assign = equality ("=" assign)?
+static Node *assign(Token **rest, Token *token) {
+
+   Node *node = equality(&token, token);
+
+   if (equal(token, "="))
+
+      node  = new_binary(ND_ASSIGN, node, assign(&token, token->next));
+      *rest = token;
+      return node;
+   }
 
 //           equality = relational ("==" relational | "!=" relational)*
 static Node *equality(Token **rest, Token *token) {
@@ -222,7 +243,7 @@ static Node *unary(Token **rest, Token *token) {
    return primary(rest, token);
 }
 
-//           primary = "(" expr ")" | num
+//           primary = "(" expr ")" | ident | num
 static Node *primary(Token **rest, Token *token) {
 
    if (equal(token, "(")) {
@@ -233,10 +254,18 @@ static Node *primary(Token **rest, Token *token) {
       return node;
    }
 
-  Node *node = new_num(get_number(token));
-  *rest = token->next;
+   Node *node;
 
-  return node;
+   if (token->kind == TK_IDENT)
+
+      node = new_var_node(*token->location);
+
+   else
+      node = new_num(get_number(token));
+
+   *rest = token->next;
+
+   return node;
 }
 
 //    program = stmt*

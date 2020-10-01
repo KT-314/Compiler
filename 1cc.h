@@ -15,6 +15,7 @@
 typedef enum {
 
    TK_RESERVED,    // キーワードまたは句読点
+   TK_IDENT,       // 識別子
    TK_NUMERIC,     // 数値リテラル
    TK_EOF,         // ファイルの終わりマーカー
 
@@ -50,9 +51,11 @@ typedef enum {
    ND_EQ,          // ==
    ND_NE,          // !=
    ND_LT,          // <
+   ND_ASSIGN,      // =
    ND_LE,          // <=
    ND_RETURN,      // "return"
    ND_EXPR_STMT,   // 式ステートメント
+   ND_VAR,         // 変数
    ND_NUM,         // 整数
 
 } NodeKind;
@@ -65,6 +68,7 @@ struct Node {
    Node    *next;  // 次のノード
    Node     *lhs;  // 左側(Left-hand side)
    Node     *rhs;  // 右側(Right-hand side)
+   char     name;  // 種類== ND_VAR の場合に使用
    long      val;  // 種類== ND_NUM の場合に使用
 };
 

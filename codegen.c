@@ -16,13 +16,54 @@ static char *re_gister(int index) {
    return r[index];
 }
 
+// 指定されたノードの絶対アドレスを計算します。
+// 特定のノードがメモリに存在しない場合はエラーです
+static void gen_addr(Node *node) {
+
+   if (node->kind == ND_VAR) {
+
+      int offset = (node->name - 'a' + 1) * 8;
+       offset += 32;   // 呼び出し先が保存したレジスタの場合
+       printf("  lea -%d(%%rbp), %s\n", offset, re_gister(top++));
+       return;
+   }
+
+   error("not an lvalue");
+}
+
+static void load(void) {
+
+   printf("  mov (%s), %s\n", re_gister(top - 1), re_gister(top - 1));
+}
+
+static void store(void) {
+
+   printf("  mov %s, (%s)\n", re_gister(top - 2), re_gister(top - 1));
+   top--;
+}
+
+// 指定されたノードのコードを生成します
 static void gen_expr(Node *node) {
 
-   if (node->kind == ND_NUM) {
+   switch (node->kind) {
 
-      printf("   mov $%lu, %s\n", node->val, re_gister(top++));
+      case ND_NUM:
 
-      return;
+         printf("   mov $%lu, %s\n", node->val, re_gister(top++));
+         return;
+
+      case ND_VAR:
+
+         gen_addr(node);
+         load();
+         return;
+
+      case ND_ASSIGN:
+
+         gen_expr(node->rhs);
+         gen_addr(node->lhs);
+         store();
+         return;
    }
 
    gen_expr(node->lhs);
@@ -119,11 +160,14 @@ void codegen(Node *node) {
    printf(".globl main\n");
    printf("main:\n");
 
-   // 呼び出し先が保存したレジスタを保存します
-   printf("   push %%r12\n");
-   printf("   push %%r13\n");
-   printf("   push %%r14\n");
-   printf("   push %%r15\n");
+   // プロローグ %r12-15 は、呼び出し先が保存したレジスタです
+   printf("   push %%rbp\n");
+   printf("   mov %%rsp, %%rbp\n");
+   printf("   sub $240, %%rsp\n");
+   printf("   mov %%r12, -8(%%rbp)\n");
+   printf("   mov %%r13, -16(%%rbp)\n");
+   printf("   mov %%r14, -24(%%rbp)\n");
+   printf("   mov %%r15, -32(%%rbp)\n");
 
    for (Node *n = node; n; n = n->next) {
 
@@ -131,12 +175,14 @@ void codegen(Node *node) {
       assert(top == 0);
    }
 
+   // エピローグ
    printf(".L.return:\n");
-   printf("   pop %%r15\n");
-   printf("   pop %%r14\n");
-   printf("   pop %%r13\n");
-   printf("   pop %%r12\n");
+   printf("   mov -8(%%rbp),  %%r12\n");
+   printf("   mov -16(%%rbp), %%r13\n");
+   printf("   mov -24(%%rbp), %%r14\n");
+   printf("   mov -32(%%rbp), %%r15\n");
+   printf("   mov %%rbp, %%rsp\n");
+   printf("   pop %%rbp\n");
    printf("   ret\n");
-
 }
 

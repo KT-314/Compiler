@@ -121,6 +121,13 @@ Token *tokenize(char *argument) {
          continue;
       }
 
+      // 識別子
+      if ('a' <= *argument && *argument <= 'z') {
+
+         current = new_token(TK_IDENT, current, argument++, 1);
+         continue;
+      }
+
       // 複数文字の句読点
       if (startswith(argument, "==") || startswith(argument, "!=") ||
           startswith(argument, "<=") || startswith(argument, ">=")) {
