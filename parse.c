@@ -127,8 +127,15 @@ static Node *compound_stmt(Token **rest, Token *token) {
 }
 
 
-//           expr-stmt = expr ";"
+//           expr-stmt = expr? ";"
 static Node *expr_stmt(Token **rest, Token *token) {
+
+   if (equal(token, ";")) {
+
+      Node *node = new_node(ND_BLOCK);
+      *rest = token->next;
+      return node;
+   }
 
    Node *node = new_unary(ND_EXPR_STMT, expr(&token, token));
    *rest = skip(token, ";");
