@@ -66,6 +66,7 @@ typedef enum {
    ND_ASSIGN,      // =
    ND_LE,          // <=
    ND_RETURN,      // "return"
+   ND_BLOCK,       // { ... }
    ND_EXPR_STMT,   // 式ステートメント
    ND_VAR,         // 変数
    ND_NUM,         // 整数
@@ -80,6 +81,10 @@ struct Node {
    Node    *next;  // 次のノード
    Node     *lhs;  // 左側(Left-hand side)
    Node     *rhs;  // 右側(Right-hand side)
+
+// Block
+   Node    *body;
+
    Var      *var;  // 種類== ND_VAR の場合に使用
    long      val;  // 種類== ND_NUM の場合に使用
 };
@@ -87,7 +92,7 @@ struct Node {
 typedef struct Function Function;
 struct Function {
 
-   Node     *node;
+   Node     *body;
    Var    *locals;
    int stack_size;
 };
