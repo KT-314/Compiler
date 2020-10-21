@@ -92,6 +92,7 @@ static long get_number(Token *token) {
 }
 
 //           stmt = "return" expr ";"
+//                | "if" "(" expr ")" stmt ("else" stmt)?
 //                | "{" compound-stmt
 //                |  expr-stmt
 static Node *stmt(Token **rest, Token *token) {
@@ -101,6 +102,20 @@ static Node *stmt(Token **rest, Token *token) {
       Node *node = new_unary(ND_RETURN, expr(&token, token->next));
       *rest = skip(token, ";");
       return node;
+   }
+
+   if (equal(token, "if")) {
+
+      Node *node = new_node(ND_IF);
+      token = skip(token->next, "(");
+      node->cond = expr(&token, token);
+      token = skip(token, ")");
+      node->then = stmt(&token, token);
+
+   if (equal(token, "else"))
+      node->els = stmt(&token, token->next);
+      *rest = token;
+   return node;
    }
 
    if (equal(token, "{"))

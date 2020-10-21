@@ -4,6 +4,12 @@
 
 static int top;
 
+static int count(void) {
+
+    static int i = 1;
+    return i++;
+}
+
 static char *re_gister(int index) {
 
    static char *r[] = {"%r10", "%r11", "%r12", "%r13", "%r14", "%r15"};
@@ -133,6 +139,22 @@ static void gen_expr(Node *node) {
 static void gen_stmt(Node *node) {
 
    switch (node->kind) {
+
+      case ND_IF: {
+
+         int c = count();
+         gen_expr(node->cond);
+         printf("   cmp $0, %s\n", re_gister(--top));
+         printf("   je  .L.else.%d\n", c);
+         gen_stmt(node->then);
+         printf("   jmp .L.end.%d\n", c);
+         printf(".L.else.%d:\n", c);
+
+         if (node->els)
+            gen_stmt(node->els);
+         printf(".L.end.%d:\n", c);
+         return;
+      }
 
       case ND_BLOCK:
 

@@ -67,6 +67,7 @@ typedef enum {
    ND_LE,          // <=
    ND_RETURN,      // "return"
    ND_BLOCK,       // { ... }
+   ND_IF,          // "if"
    ND_EXPR_STMT,   // 式ステートメント
    ND_VAR,         // 変数
    ND_NUM,         // 整数
@@ -79,8 +80,14 @@ struct Node {
 
    NodeKind kind;  // ノードの種類
    Node    *next;  // 次のノード
+
    Node     *lhs;  // 左側(Left-hand side)
    Node     *rhs;  // 右側(Right-hand side)
+
+// "if" ステートメント
+   Node    *cond;
+   Node    *then;
+   Node     *els;
 
 // Block
    Node    *body;

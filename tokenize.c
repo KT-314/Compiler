@@ -86,6 +86,23 @@ static bool is_alnum(char c) {
    return is_alpha(c) || ('0' <= c && c <= '9');
 }
 
+static bool is_keyword(Token *tok) {
+
+   static char *kw[] = {"return", "if", "else"};
+
+   for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
+
+     if (equal(tok, kw[i]))
+        return true;
+   return false;
+}
+
+static void convert_keywords(Token *tok) {
+  for (Token *t = tok; t->kind != TK_EOF; t = t->next)
+    if (t->kind == TK_IDENT && is_keyword(t))
+      t->kind = TK_RESERVED;
+}
+
 // `current_input` をトークン化し、新しいトークンを返します
 Token *tokenize(char *argument) {
 
@@ -110,14 +127,6 @@ Token *tokenize(char *argument) {
          char      *now  = argument;
          current->value  = strtoul(argument, &argument, 10);
          current->length = argument - now;
-         continue;
-      }
-
-      // キーワード
-      if (startswith( argument, "return") && !is_alnum(argument[6])) {
-
-         current = new_token(TK_RESERVED, current, argument, 6);
-         argument += 6;
          continue;
       }
 
@@ -153,6 +162,7 @@ Token *tokenize(char *argument) {
    }
 
    new_token(TK_EOF, current, argument, 0);
+   convert_keywords(head.next);
 
    return head.next;
 }
