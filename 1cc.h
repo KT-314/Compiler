@@ -65,6 +65,7 @@ typedef enum {
    ND_LT,          // <
    ND_ASSIGN,      // =
    ND_LE,          // <=
+   ND_FOR,         // "for"
    ND_RETURN,      // "return"
    ND_BLOCK,       // { ... }
    ND_IF,          // "if"
@@ -84,16 +85,18 @@ struct Node {
    Node     *lhs;  // 左側(Left-hand side)
    Node     *rhs;  // 右側(Right-hand side)
 
-// "if" ステートメント
+// "if" or "for" ステートメント
    Node    *cond;
    Node    *then;
    Node     *els;
+   Node    *init;
+   Node     *inc;
 
 // Block
    Node    *body;
 
-   Var      *var;  // 種類== ND_VAR の場合に使用
-   long      val;  // 種類== ND_NUM の場合に使用
+   Var      *var;  // 種類 == ND_VAR の場合に使用
+   long      val;  // 種類 == ND_NUM の場合に使用
 };
 
 typedef struct Function Function;
